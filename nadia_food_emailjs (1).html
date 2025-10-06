@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Nadia — What do you want to eat?</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg1: #FFF8EE;
+      --bg2: #FFEFE6;
+      --accent: #FF7A59;
+      --muted:#6b6b6b;
+      --card:#fff;
+      font-family: 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+    }
+    *{box-sizing:border-box}
+    body{margin:0; min-height:100vh; background: linear-gradient(135deg,var(--bg1),var(--bg2)); display:flex; align-items:center; justify-content:center; padding:24px;}
+    .site{width:100%; max-width:980px; background: linear-gradient(180deg, rgba(255,255,255,0.8), rgba(255,255,255,0.9)); border-radius:18px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); padding:22px;}
+    header{display:flex; gap:16px; align-items:center}
+    .logo{width:86px; height:86px; border-radius:16px; background:linear-gradient(135deg,#fff 0%, #fff7f2 100%); display:flex; align-items:center; justify-content:center; font-size:34px}
+    h1{margin:0; font-size:22px}
+    p.lead{margin:6px 0 0; color:var(--muted)}
+
+    .layout{display:grid; grid-template-columns: 320px 1fr; gap:18px; margin-top:18px}
+
+    .menu{background:var(--card); border-radius:12px; padding:12px; box-shadow: 0 6px 18px rgba(0,0,0,0.03)}
+    .menu h2{margin:0 0 8px; font-size:16px}
+    .food-list{margin-top:12px; display:flex; flex-direction:column; gap:8px; max-height:52vh; overflow:auto; padding-right:6px}
+    .food-item{display:flex; gap:12px; align-items:center; padding:8px; border-radius:10px; cursor:pointer}
+    .food-item:hover{background:linear-gradient(90deg, rgba(255,122,89,0.06), rgba(255,122,89,0.03))}
+    .food-emoji{font-size:22px}
+    .food-name{font-weight:700}
+
+    .content{background:var(--card); border-radius:12px; padding:18px; box-shadow: 0 6px 18px rgba(0,0,0,0.03); min-height:300px; position:relative}
+
+    button{cursor:pointer; border:0; padding:10px 12px; border-radius:10px; font-weight:700}
+    .btn-primary{background:var(--accent); color:white}
+    .btn-ghost{background:transparent; border:1px solid rgba(0,0,0,0.06)}
+    .selected{background:linear-gradient(90deg, rgba(255,122,89,0.3), rgba(255,122,89,0.15)) !important;}
+
+    .modal{position:fixed; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; justify-content:center; align-items:center; display:none}
+    .modal-content{background:white; padding:20px; border-radius:12px; max-width:400px; width:90%;}
+
+    .added-cart{position:absolute; top:10px; right:10px; background:var(--accent); color:white; padding:8px 12px; border-radius:10px; display:none;}
+
+    .cart-item{display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;}
+    .cart-item button{margin-left:8px; background:#ff5c5c; color:white; border-radius:6px; padding:2px 6px; font-size:12px;}
+
+    @media (max-width:880px){.layout{grid-template-columns:1fr;}.menu{order:2}.content{order:1}}
+  </style>
+</head>
+<body>
+  <div class="site" role="main">
+    <header>
+      <div class="logo">🍲</div>
+      <div>
+        <h1>Hey Nadia — what do you want to eat?</h1>
+        <p class="lead">Pick one, choose options, then checkout!</p>
+      </div>
+    </header>
+
+    <div class="layout">
+      <aside class="menu" aria-label="Food menu">
+        <h2>Main menu</h2>
+        <div class="food-list" id="foodList"></div>
+      </aside>
+
+      <section class="content">
+        <div id="optionContainer"></div>
+        <div style="margin-top:16px;"><button id="checkoutBtn" class="btn-primary">Checkout</button></div>
+        <div class="added-cart" id="addedCart">Added to Cart!</div>
+        <div class="modal" id="checkoutModal">
+          <div class="modal-content" id="checkoutContent">
+            <h3>Your Order</h3>
+            <div id="cartList"></div>
+            <div style="margin-top:12px; display:flex; gap:10px; justify-content:flex-end;">
+              <button id="cancelOrder" class="btn-ghost">Cancel</button>
+              <button id="confirmOrder" class="btn-primary">Confirm</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- EmailJS SDK -->
+  <script src="https://cdn.emailjs.com/dist/email.min.js"></script>
+  <script>
+    emailjs.init('YOUR_EMAILJS_USER_ID'); // <-- Replace with your EmailJS User ID
+
+    const foods = [
+      {name:'Steak', emoji:'🥩', options:{cooking:['Rare','Medium Rare','Medium','Medium Well','Well Done']}},
+      {name:'Pasta', emoji:'🍝', options:{type:['Classic Tomato Pasta','Creamy Garlic Pasta'], pastaType:'text'}},
+      {name:'Noodles', emoji:'🍜', options:{type:['Ramen Noodles','Chinese Noodles']}},
+      {name:'Mushroom Soup', emoji:'🍄'},
+      {name:'Fried Rice', emoji:'🍚', options:{type:['Soy Sauce Fried Rice','Salt and Pepper Fried Rice']}},
+      {name:'Smash Burger', emoji:'🍔', options:{toppings:['Lettuce','Pickles','Ketchup','Mayo','Onions','Cheese'], patties:['1','2','3']}},
+      {name:'Wraps', emoji:'🥙', options:{type:['Chicken Wraps','Beef Wraps']}},
+      {name:'Ice Cream', emoji:'🍨', options:{flavor:['Banana','Vanilla','Berries','Matcha']}},
+      {name:'Boba', emoji:'🧋', options:{type:['Milk Tea','Matcha']}}
+    ];
+
+    const foodList = document.getElementById('foodList');
+    const optionContainer = document.getElementById('optionContainer');
+    const checkoutBtn = document.getElementById('checkoutBtn');
+    const checkoutModal = document.getElementById('checkoutModal');
+    const cartList = document.getElementById('cartList');
+    const addedCart = document.getElementById('addedCart');
+    const cancelOrder = document.getElementById('cancelOrder');
+    const confirmOrder = document.getElementById('confirmOrder');
+
+    let cart = [];
+    let selectedOptions = {};
+
+    function renderFoodList(){
+      foodList.innerHTML='';
+      foods.forEach(f=>{
+        const el = document.createElement('div');
+        el.className='food-item';
+        el.innerHTML=`<div class='food-emoji'>${f.emoji}</div><div class='food-name'>${f.name}</div>`;
+        el.addEventListener('click', ()=>showOptions(f));
+        foodList.appendChild(el);
+      });
+    }
+
+    function showOptions(food){
+      selectedOptions = {};
+      optionContainer.innerHTML='';
+      const div = document.createElement('div');
+      div.innerHTML=`<h3>${food.emoji} ${food.name}</h3>`;
+
+      if(food.options){
+        for(const key in food.options){
+          const opt = food.options[key];
+          if(Array.isArray(opt)){
+            const group = document.createElement('div');
+            group.innerHTML=`<strong>${key.charAt(0).toUpperCase()+key.slice(1)}:</strong>`;
+            opt.forEach(o=>{
+              const btn = document.createElement('button');
+              btn.textContent=o;
+              btn.className='btn-ghost';
+              btn.style.margin='4px';
+              btn.addEventListener('click', ()=>{
+                if(food.name==='Smash Burger' && key==='toppings'){
+                  btn.classList.toggle('selected');
+                  const selected = group.querySelectorAll('.selected');
+                  selectedOptions[key] = Array.from(selected).map(s=>s.textContent);
+                } else {
+                  group.querySelectorAll('button').forEach(b=>b.classList.remove('selected'));
+                  btn.classList.add('selected');
+                  selectedOptions[key] = o;
+                }
+              });
+              group.appendChild(btn);
+            });
+            div.appendChild(group);
+          } else if(opt==='text'){
+            const inputDiv = document.createElement('div');
+            inputDiv.innerHTML=`<label>${key.charAt(0).toUpperCase()+key.slice(1)}: <input type='text' id='freeText' placeholder='Type here'/></label>`;
+            div.appendChild(inputDiv);
+          }
+        }
+      }
+
+      const addBtn = document.createElement('button');
+      addBtn.textContent='Add to Cart';
+      addBtn.className='btn-primary';
+      addBtn.style.marginTop='8px';
+      addBtn.addEventListener('click', ()=>{
+        let item = {name:food.name};
+        for(const k in selectedOptions){
+          item[k] = selectedOptions[k];
+        }
+        const textInput = div.querySelector('#freeText');
+        if(textInput && textInput.value.trim()){
+          item['custom'] = textInput.value.trim();
+        }
+        cart.push(item);
+        addedCart.style.display='block';
+        setTimeout(()=>{addedCart.style.display='none';},2000);
+      });
+
+      div.appendChild(addBtn);
+      optionContainer.appendChild(div);
+    }
+
+    function renderCart(){
+      cartList.innerHTML='';
+      cart.forEach((c,i)=>{
+        const div = document.createElement('div');
+        div.className='cart-item';
+        let details = Object.keys(c).filter(k=>k!=='name').map(k=>Array.isArray(c[k])?c[k].join(', '):c[k]).join(', ');
+        div.innerHTML=`<span>${i+1}. ${c.name}${details ? ' - '+details : ''}</span>`;
+        const removeBtn = document.createElement('button');
+        removeBtn.textContent='Remove';
+        removeBtn.addEventListener('click', ()=>{
+          cart.splice(i,1);
+          renderCart();
+        });
+        div.appendChild(removeBtn);
+        cartList.appendChild(div);
+      });
+    }
+
+    checkoutBtn.addEventListener('click', ()=>{
+      if(cart.length===0){alert('Cart is empty!'); return;}
+      renderCart();
+      checkoutModal.style.display='flex';
+    });
+
+    cancelOrder.addEventListener('click', ()=>{checkoutModal.style.display='none'});
+
+    confirmOrder.addEventListener('click', ()=>{
+      if(cart.length===0){alert('Cart is empty!'); return;}
+      let orderText = cart.map(c=>{
+        let details = Object.keys(c).filter(k=>k!=='name').map(k=>Array.isArray(c[k])?c[k].join(', '):c[k]).join(', ');
+        return `${c.name}${details ? ' - '+details : ''}`;
+      }).join('\n');
+
+      // Send email via EmailJS
+      emailjs.send('YOUR_SERVICE_ID','YOUR_TEMPLATE_ID',{
+        to_email: 'jackwithdaw@gmail.com',
+        order: orderText
+      }).then(()=>{
+        alert('Your Order has been successfully sent!');
+      }).catch(err=>{
+        alert('Error sending order: '+err);
+      });
+
+      checkoutModal.style.display='none';
+      optionContainer.innerHTML=`<h3>Your Order has been successfully placed 🎉</h3>`;
+      cart = [];
+    });
+
+    renderFoodList();
+  </script>
+</body>
+</html>
